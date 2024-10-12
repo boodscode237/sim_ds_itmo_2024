@@ -1,29 +1,33 @@
-WITH 
-    date_range AS (
-        SELECT 
-            toStartOfDay(timestamp) AS day
-        FROM 
-            default.churn_submits
-        GROUP BY 
-            day
-    ),
-    active_users AS (
-        SELECT 
-            day,
-            COUNT(DISTINCT user_id) AS wau
-        FROM 
-            default.churn_submits
-        WHERE 
-            timestamp >= day - INTERVAL 6 DAY AND timestamp <= day
-        GROUP BY 
-            day
-    )
+WITH date_range AS (
+    SELECT 
+        toDate(timestamp) AS day
+    FROM 
+        default.churn_submits
+    GROUP BY 
+        day
+    ORDER BY 
+        day
+),
+
+daily_users AS (
+    SELECT 
+        user_id, 
+        arrayJoin(range(7)) AS offset,
+        toDate(timestamp) AS activity_day
+    FROM 
+        default.churn_submits
+)
+
 SELECT 
-    day,
-    wau
+    dr.day,
+    COUNT(DISTINCT du.user_id) AS wau
 FROM 
-    date_range
+    date_range dr
 LEFT JOIN 
-    active_users ON date_range.day = active_users.day
+    daily_users du 
+ON 
+    dr.day = du.activity_day + INTERVAL du.offset DAY
+GROUP BY 
+    dr.day
 ORDER BY 
-    day ASC;
+    dr.day;
